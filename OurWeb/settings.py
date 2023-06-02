@@ -124,7 +124,7 @@ STATIC_URL = 'static/'
 
 # STATICFILES_DIRS：这个变量指定了其他静态文件目录的路径。在这个例子中，指定了一个静态文件目录os.path.join(BASE_DIR, "/static/")。
 STATICFILES_DIRS = (
-    os.path.join(BASE_DIR, "/static/"),
+    os.path.join(BASE_DIR, 'meals', 'static'),
 )
 
 # Default primary key field type
