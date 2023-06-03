@@ -13,13 +13,13 @@ urlpatterns = [
     path('detail/<int:meal_id>/', views.detail, name='detail'),
 
     # 登录页面
-    path('login/', views.login, name='login'),
+    path('login/', views.user_login, name='login'),
 
     # 注册页面
     path('register/', views.register, name='register'),
 
     # 退出登录
-    path('logout/', views.logout, name='logout'),
+    path('logout/', views.user_logout, name='logout'),
 
     # 菜单和菜单内标签筛选 ,启动筛选功能
     path('menu/', views.menu, name='menu'),
