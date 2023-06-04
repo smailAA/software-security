@@ -1,20 +1,24 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse, HttpResponseRedirect
 from meals.models import *
-from django.urls import reverse
 from meals.forms import *
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth import authenticate, login, logout
+from django.shortcuts import render, redirect
+import django.contrib.auth.models as dj_model
 
 
 # 首页 （包含搜索功能）
-#5.5 黄祖华 首页搜索完善
+# 5.5 黄祖华 首页搜索完善
 def index(request):
     if not request.session.get('is_login', None):  # 如果未登录，跳转到登录页面
         return redirect('/meals/login/')
     else:
-        #修改索引超出问题
+        # 修改索引超出问题
         most_likes_meal = Meal.objects.filter().order_by("-likes")  # 按点赞数降序排列菜品
         content = {'meal1': most_likes_meal[0], 'meal2': most_likes_meal[1], 'meal3': most_likes_meal[2]}
         return render(request, 'meals/index.html', content)
+
 
 def search_result(request):
     if not request.session.get('is_login', None):  # 如果未登录，跳转到登录页面
@@ -23,35 +27,36 @@ def search_result(request):
     if request.method == 'POST':
         search_text = request.POST.get('search_data')  # 从前端传入了字符串，没有使用表单
         search_text_len = len(search_text)
-        if search_text_len == 0 :
+        if search_text_len == 0:
             content = {'search__result': []}
             return render(request, 'meals/search_result.html', content)
-        i=0
-        search_result_list = [] #该列表用以储存单个字搜索的结果
-        search_result_list_len = [] #该列表用以储存每个字搜索出的结果的数量
-        while i<search_text_len :
+        i = 0
+        search_result_list = []  # 该列表用以储存单个字搜索的结果
+        search_result_list_len = []  # 该列表用以储存每个字搜索出的结果的数量
+        while i < search_text_len:
             search_result_list.append(Meal.objects.filter(name__contains=search_text[i]))
             search_result_list_len.append(len(search_result_list[i]))
-            i = i+1
-        i=1 #链式搜索第一步较特殊，需从Meal里filter，故单独写第一步
-        search_result_list_final = [] #该列表用以进行链式搜索
+            i = i + 1
+        i = 1  # 链式搜索第一步较特殊，需从Meal里filter，故单独写第一步
+        search_result_list_final = []  # 该列表用以进行链式搜索
         search_result_list_max = max(search_result_list_len)
         search_text_i = search_result_list_len.index(search_result_list_max)
         search_result_list_final.append(Meal.objects.filter(name__contains=search_text[search_text_i]))
         search_result_list_len[search_text_i] = 0
-        #26-29行：先获取单字搜索【结果数量最多】的字的下标，再对该下标对应的原字符串中的字进行filter，而后将该下标对应的搜索结果数量置0，标记为已搜索
-        while i<search_text_len :
+        # 26-29行：先获取单字搜索【结果数量最多】的字的下标，再对该下标对应的原字符串中的字进行filter，而后将该下标对应的搜索结果数量置0，标记为已搜索
+        while i < search_text_len:
             search_result_list_max = max(search_result_list_len)
             if search_result_list_max == 0:
                 break
-            #该if语句为避免重复对已置0，即标记为已搜索字再次搜索
+            # 该if语句为避免重复对已置0，即标记为已搜索字再次搜索
             search_text_i = search_result_list_len.index(search_result_list_max)
             if len(search_result_list_final[i - 1].filter(name__contains=search_text[search_text_i])) == 0:
                 break
-            #该if语句为当链式搜索中途无搜索结果时结束循环
-            search_result_list_final.append(search_result_list_final[i-1].filter(name__contains=search_text[search_text_i]))
-            i = i+1
-        search__result = search_result_list_final[i-1] #获取链式搜索最终结果
+            # 该if语句为当链式搜索中途无搜索结果时结束循环
+            search_result_list_final.append(
+                search_result_list_final[i - 1].filter(name__contains=search_text[search_text_i]))
+            i = i + 1
+        search__result = search_result_list_final[i - 1]  # 获取链式搜索最终结果
         content = {'search__result': search__result}
 
         return render(request, 'meals/search_result.html', content)
@@ -106,7 +111,7 @@ def detail(request, meal_id):
         collect = False
 
     content = {'meal': meal, 'comments': comments, 'tags': tags, 'like': like, 'dislike': dislike,
-               'collect': collect, 'current_user_like_comment_list': current_user_like_comment_list,'symbol':symbol}
+               'collect': collect, 'current_user_like_comment_list': current_user_like_comment_list, 'symbol': symbol}
     return render(request, 'meals/detail.html', content)
 
 
@@ -198,35 +203,29 @@ def collect_meal(request, meal_id):
     return redirect('meals:detail', meal_id=meal_id)
 
 
-# 登录页面，已完成
-def login(request):
-    if request.session.get('is_login', None):  # 不允许重复登录
-        return redirect('/meals/index/')
+def user_login(request):
     if request.method == 'POST':
         login_form = UserLoginForm(request.POST)
-        message = '亲，好像内容不太对哦~'
-        if login_form.is_valid():
-            username = login_form.cleaned_data.get('user_name')
-            password = login_form.cleaned_data.get('password')
-            try:
-                user = User.objects.get(user_name=username)
-            except:
-                message = '亲，小生没有查到您的账户哦(⊙o⊙)'
-                return render(request, 'meals/login.html', locals())
+        username = request.POST['user_name']
+        password = request.POST['password']
+        user = authenticate(request, username=username, password=password)
+        if user is not None:
+            login(request, user)
+            user_self = User.objects.get(user_name=username)
+            print(user_self)
+            request.session['is_login'] = True
+            request.session['user_id'] = user_self.id
+            request.session['user_name'] = username
 
-            if user.password == password:
-                request.session['is_login'] = True
-                request.session['user_id'] = user.id
-                request.session['user_name'] = user.user_name
-                return redirect('/meals/index/')
-            else:
-                message = '亲，密码好像不对哦~'
-                return render(request, 'meals/login.html', locals())
+            return redirect('/meals/index/')  # 重定向到登录成功后的页面
         else:
+            error_message = "请检查账号密码是否正确"
+            print("wor")
             return render(request, 'meals/login.html', locals())
-    login_form = UserLoginForm()
-
-    return render(request, 'meals/login.html', locals())
+    else:
+        login_form = UserLoginForm()
+        return render(request, 'meals/login.html', locals())
+    ############~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##########################
 
 
 # 账户注册页面,已完成
@@ -235,14 +234,12 @@ def register(request):
         return redirect('/meals/index/')
 
     if request.method == 'POST':
-        register_form = RegisterForm(request.POST)
+        register_form = UserCreationForm(request.POST)
         message = "请检查填写的内容！"
         if register_form.is_valid():
-            user_name = register_form.cleaned_data.get('user_name')
+            user_name = register_form.cleaned_data.get('username')
             password1 = register_form.cleaned_data.get('password1')
             password2 = register_form.cleaned_data.get('password2')
-            # email = register_form.cleaned_data.get('email')
-            # telephone = register_form.cleaned_data.get('telephone')
 
             if password1 != password2:
                 message = '两次输入的密码不同！'
@@ -252,19 +249,24 @@ def register(request):
                 if same_name_user:
                     message = '该用户名已经存在'
                     return render(request, 'meals/register.html', locals())
-
-                User.objects.create(user_name=user_name, password=password1)
-                return redirect('/meals/login/')
+                if register_form.is_valid():
+                    user = register_form.save()
+                    print("yes yes yes")
+                    password1 = "******"
+                    User.objects.create(user_name=user_name, password=password1)
+                    return redirect('/meals/login/')
+                return render(request, 'meals/register.html', locals())
         else:
             return render(request, 'meals/register.html', locals())
-    register_form = RegisterForm()
+    register_form = UserCreationForm()
     return render(request, 'meals/register.html', locals())
 
 
 # 退出登录，已完成
-def logout(request):
+def user_logout(request):
     if not request.session.get('is_login', None):  # 如果本来就未登录，也就没有登出一说
         return redirect("/meals/login/")
+    logout(request)
     request.session.flush()
     return redirect("/meals/login/")
 
@@ -311,6 +313,7 @@ def myself(request):
     content = {'user': user, 'collect_meal': collected_meals}
     return render(request, 'meals/myself.html', content)
 
+
 def myself_mealcollect(request):
     if not request.session.get('is_login', None):  # 如果未登录， 跳转到登录页面
         return redirect('/meals/login/')
@@ -320,6 +323,7 @@ def myself_mealcollect(request):
     content = {'user': user, 'collect_meal': collected_meals}
     return render(request, 'meals/myself_mealcollect.html', content)
 
+
 def myself_meallike(request):
     if not request.session.get('is_login', None):  # 如果未登录， 跳转到登录页面
         return redirect('/meals/login/')
@@ -328,6 +332,7 @@ def myself_meallike(request):
     liked_meals = LikeMeal.objects.filter(user=user)  # 某用户收藏的所有菜品集合
     content = {'user': user, 'like_meal': liked_meals}
     return render(request, 'meals/myself_meallike.html', content)
+
 
 # 修改个人信息
 def modify_myself(request):
@@ -363,4 +368,3 @@ def modify_myself(request):
     modify_myself_form = ModifyMyselfForm()
     content = {'modify_myself_form': modify_myself_form, 'user': user}
     return render(request, 'meals/modify_myself.html', content)  # 返回空表单让用户填写
-
