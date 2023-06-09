@@ -26,6 +26,7 @@ def search_result(request):
 
     if request.method == 'POST':
         search_text = request.POST.get('search_data')  # 从前端传入了字符串，没有使用表单
+        search_text = escape(search_text)
         search_text_len = len(search_text)
         if search_text_len == 0:
             content = {'search__result': []}
@@ -74,6 +75,7 @@ def detail(request, meal_id):
     symbol = True
     if request.method == 'POST':  # post请求提交评论
         comment_content = request.POST.get('message')  # 获取前端输入内容
+        comment_content = escape(comment_content)
         if comment_content:
             Comment.objects.create(user=user, meal=meal, content=comment_content)
         else:
@@ -208,6 +210,8 @@ def user_login(request):
         login_form = UserLoginForm(request.POST)
         username = request.POST['user_name']
         password = request.POST['password']
+        username = escape(username)
+        password = escape(password)
         user = authenticate(request, username=username, password=password)
         if user is not None:
             login(request, user)
@@ -240,6 +244,9 @@ def register(request):
             user_name = register_form.cleaned_data.get('username')
             password1 = register_form.cleaned_data.get('password1')
             password2 = register_form.cleaned_data.get('password2')
+            user_name = escape(user_name)
+            password1 = escape(password1)
+            password2 = escape(password2)
 
             if password1 != password2:
                 message = '两次输入的密码不同！'
@@ -280,6 +287,7 @@ def menu(request):
     # 通过用户选择的标签确定下一步删选结果函数的参数
     try:
         tags = request.POST['Tag']
+        tags = escape(tags)
         # 每点一个tag均添加至列表selected_tags中保存
     except KeyError:
         # 如果用户没有筛选标签，则重新返回菜单页面
@@ -346,6 +354,7 @@ def modify_myself(request):
         if modify_myself_form.is_valid():
             # 检查是否新用户名是否已被使用
             user_name = modify_myself_form.cleaned_data.get('user_name')
+            user_name = escape(user_name)
             some_user1 = User.objects.filter(user_name=user_name).filter(id__lt=user.id)  # 查找id和此用户不同，是否有重名
             some_user2 = User.objects.filter(user_name=user_name).filter(id__gt=user.id)
             message = '这个用户名已经有人使用了哦'
@@ -357,6 +366,9 @@ def modify_myself(request):
             user.password = modify_myself_form.cleaned_data.get('password')
             user.telephone = modify_myself_form.cleaned_data.get('telephone')
             user.email = modify_myself_form.cleaned_data.get('email')
+            user.password = escape(user.password)
+            user.telephone = escape(user.telephone)
+            user.email = escape(user.email)
             if 'avatar' in request.FILES:
                 user.avatar = modify_myself_form.cleaned_data.get('avatar')  # 判断用户是否上传了图片
             user.save()
