@@ -6,6 +6,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import authenticate, login, logout
 from django.shortcuts import render, redirect
 import django.contrib.auth.models as dj_model
+from django.template.defaultfilters import escape
 
 
 # 首页 （包含搜索功能）
